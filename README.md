@@ -32,4 +32,4 @@ Nuxt 4.5+ (с пометками про v5), TypeScript strict + `nuxi typecheck
 
 ---
 
-Часть сборного репозитория лабораторных работ — [submodule-group-lab](https://github.com/meeymirita/submodule-group-lab).
+Часть сборного репозитория лабораторных работ — [anitech-performance](https://github.com/meeymirita/anitech-performance).
