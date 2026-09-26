@@ -260,18 +260,18 @@ definePageMeta({
 ├── imports.d.ts           ← все автоимпортируемые функции и откуда они
 ├── components.d.ts        ← глобальные компоненты
 ├── types/nitro-routes.d.ts ← маршруты API и типы их ответов
-└── tsconfig.json          ← ваш tsconfig.json просто ссылается на него</code></pre>
+└── tsconfig.*.json        ← app, server, shared, node: ваш tsconfig.json просто ссылается на них</code></pre>
 <div class="note-box"><span class="tag">ЦЕНА АВТОИМПОРТОВ</span> Удобно, но при чтении кода не видно, откуда взялась функция. Правило лабы: всё своё из <code>shared/</code> импортируем <b>явно</b> через <code>#shared/...</code>, чтобы граница «общий код» была видна в каждом файле.</div>
 
 <h3>2.6 <code>useFetch</code> и <code>useAsyncData</code></h3>
 <p>Главные composables Nuxt. Они выполняют запрос на сервере во время SSR, кладут результат в payload и <b>не повторяют запрос</b> при гидрации в браузере.</p>
 <pre><code>const { data, status, error, refresh } = await useFetch('/api/status')
-// data: Ref&lt;{ services: ...; incidents: ... } | undefined&gt; — тип выведен из server/api/status.get.ts
+// data: Ref&lt;{ services: ...; active: ...; generatedAt: string } | undefined&gt; — тип выведен из server/api/status.get.ts
 
 const { data: article } = await useAsyncData(`kb-${slug}`, () =&gt;
   queryCollection('kb').path(`/kb/${category}/${slug}`).first()
 )</code></pre>
-<p><code>useFetch(url)</code> — это <code>useAsyncData(ключ-из-url, () =&gt; $fetch(url))</code>. Подробно — в разделе 5.</p>
+<p><code>useFetch(url)</code> — это <code>useAsyncData(автоключ, () =&gt; $fetch(url))</code>: ключ Nuxt строит сам — из места вызова в коде, URL и опций. Подробно — в разделе 5.</p>
 
 <h3>2.7 <code>$fetch</code></h3>
 <p>Обёртка над fetch (библиотека ofetch): парсит JSON, бросает ошибку на 4xx/5xx. На сервере запрос к собственному <code>/api/...</code> вызывает хендлер напрямую, без HTTP. Используется в обработчиках событий (клик, submit), а не в setup для первичной загрузки — почему, покажет шаг 2.2.</p>
@@ -280,7 +280,7 @@ const { data: article } = await useAsyncData(`kb-${slug}`, () =&gt;
 <p>Общее SSR-безопасное состояние по ключу: создаётся на сервере в рамках одного запроса, сериализуется в payload, подхватывается в браузере.</p>
 <pre><code>const recent = useState&lt;number[]&gt;('recently-viewed', () =&gt; [])</code></pre>
 <h3>2.9 Route middleware</h3>
-<p>Функции перед навигацией, аналог <code>beforeEach</code> во Vue Router. Файлы в <code>app/middleware/</code>: <code>auth.ts</code> подключается страницей по имени, <code>*.global.ts</code> — ко всем маршрутам. Выполняются на сервере при первой загрузке и в браузере при переходах.</p>
+<p>Функции перед навигацией, аналог <code>beforeEach</code> во Vue Router. Файлы в <code>app/middleware/</code>: <code>auth.ts</code> подключается страницей по имени, <code>*.global.ts</code> — ко всем маршрутам. Выполняются на сервере при первой загрузке (и ещё раз в браузере при её гидрации) и в браузере при переходах.</p>
 <pre><code>export default defineNuxtRouteMiddleware((to) =&gt; {
   const { loggedIn } = useUserSession()
   if (!loggedIn.value) return navigateTo(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
@@ -370,7 +370,7 @@ const { data: article } = await useAsyncData(`kb-${slug}`, () =&gt;
 
 <h3>5.1 Что делает <code>useAsyncData</code></h3>
 <p>На сервере: вызывает функцию, ждёт результат, кладёт в payload под <b>ключом</b>. В браузере при гидрации: находит ключ в payload и отдаёт данные без вызова. При клиентском переходе на страницу: payload нет — вызывает функцию в браузере.</p>
-<p>Ключ — это идентичность данных. Два вызова с одним ключом делят один результат (дедупликация). У <code>useFetch</code> ключ строится из URL и опций автоматически, у <code>useAsyncData</code> вы задаёте его сами — и отвечаете за уникальность: <code>useAsyncData('article', ...)</code> на двух страницах статей будет отдавать одну статью.</p>
+<p>Ключ — это идентичность данных. Два вызова с одним ключом делят один результат (дедупликация). У <code>useFetch</code> ключ строится автоматически — из места вызова в коде (файл и порядковый номер вызова), URL и опций: два <code>useFetch('/api/status')</code> в разных строках получат <b>разные</b> ключи, и чтобы они делили данные, ключ задают явно (<code>key: 'status'</code>). У <code>useAsyncData</code> вы задаёте его сами — и отвечаете за уникальность: <code>useAsyncData('article', ...)</code> на двух страницах статей будет отдавать одну статью.</p>
 
 <h3>5.2 Опции, которые понадобятся</h3>
 <table>
@@ -523,7 +523,7 @@ const items = await queryCollection(event, 'kb').select('title', 'description', 
 │   ├── middleware/             auth.ts, agent.ts
 │   ├── components/             StatusBadge, TicketForm, AppHeader…
 │   ├── composables/            useRecentlyViewed.ts
-│   └── stores/                 queue.ts (Pinia, кабинет агента)
+│   └── stores/                 status.ts (баннер сбоев), queue.ts (кабинет агента) — Pinia
 ├── tests/                      unit/, nuxt/, e2e/
 └── docs/nuxt-notes.md          ответы «проверь себя»</code></pre>
 <h3>Поток одного запроса: клиент открывает <code>/tickets</code> напрямую</h3>
@@ -961,11 +961,17 @@ const data = ref(await $fetch('/api/status'))
 // ✅ как было
 const { data } = await useFetch('/api/status')
 &lt;/script&gt;</code></pre>
-<p>Теперь дедупликация. Временно вызовите тот же <code>useFetch</code> дважды в одной странице:</p>
-<pre><code>const { data } = await useFetch('/api/status')
-const { data: again } = await useFetch('/api/status')     // ВРЕМЕННО
-console.log('один и тот же ref?', data === again)</code></pre>
-<div class="why"><b>Зачем:</b> <code>$fetch</code> в setup выполняется и на сервере (для HTML), и в браузере при гидрации: setup идёт второй раз, и никто не сказал ему, что данные уже есть. Пользователь видит страницу сразу (HTML с сервера), а потом браузер зря дёргает API ещё раз. В худшем случае ответ приходит другим и страница «прыгает». <code>useFetch</code> кладёт результат в payload под ключом, и при гидрации находит его там. Два <code>useFetch</code> с одним URL получают один ключ: запрос один, данные общие.</div>
+<p>Теперь дедупликация. Временно вызовите <code>useFetch</code> дважды в одной странице — сначала вариант 1, потом замените его на вариант 2 (вместе они не компилируются: <code>data</code> объявлена дважды):</p>
+<pre><code>// ВРЕМЕННО, вариант 1: ключи автоматические
+const { data } = await useFetch('/api/status')
+const { data: again } = await useFetch('/api/status')
+console.log('одни и те же данные?', data.value === again.value)
+
+// ВРЕМЕННО, вариант 2: один явный ключ
+const { data } = await useFetch('/api/status', { key: 'status' })
+const { data: again } = await useFetch('/api/status', { key: 'status' })
+console.log('одни и те же данные?', data.value === again.value)</code></pre>
+<div class="why"><b>Зачем:</b> <code>$fetch</code> в setup выполняется и на сервере (для HTML), и в браузере при гидрации: setup идёт второй раз, и никто не сказал ему, что данные уже есть. Пользователь видит страницу сразу (HTML с сервера), а потом браузер зря дёргает API ещё раз. В худшем случае ответ приходит другим и страница «прыгает». <code>useFetch</code> кладёт результат в payload под ключом, и при гидрации находит его там. Автоматический ключ <code>useFetch</code> включает место вызова, поэтому два вызова в разных строках — это два ключа и два запроса, даже с одним URL. Общий явный <code>key</code> делает их одним: запрос один, данные общие.</div>
 <div class="fix-box"><span class="tag">ОЖИДАЕМЫЙ РЕЗУЛЬТАТ</span>
 <pre># $fetch в setup, прямое открытие /status:
 [api/status] хендлер вызван          ← SSR
@@ -974,9 +980,14 @@ console.log('один и тот же ref?', data === again)</code></pre>
 # useFetch:
 [api/status] хендлер вызван          ← только SSR; в Network запроса нет
 
-# два useFetch с одним URL:
+# два useFetch, автоматические ключи:
+[api/status] хендлер вызван
+[api/status] хендлер вызван          ← два ключа — два вызова
+одни и те же данные? false
+
+# два useFetch с key: 'status':
 [api/status] хендлер вызван          ← один раз
-один и тот же ref? true              (в Nuxt 4 одинаковые ключи делят один ref)</pre>
+одни и те же данные? true            (в Nuxt 4 вызовы с одним ключом делят одни данные)</pre>
 </div>
 <div class="note-box"><span class="tag">ПРОВЕРЬ СЕБЯ</span><ul><li>Найдите в view-source <code>__NUXT_DATA__</code> и в нём строку «Медленное подключение из дома». Как devalue хранит повторяющиеся значения?</li><li>Откройте <code>/status</code> клиентским переходом с главной. Сколько раз вызван хендлер и где? Почему теперь в Network запрос есть, и это правильно?</li><li>Удалите второй <code>useFetch</code>. Сформулируйте правило «useFetch или $fetch» одной фразой.</li></ul></div>
 </div></div>
@@ -1712,12 +1723,12 @@ definePageMeta({ middleware: ['auth'] })
 <pre><code>curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" localhost:3000/tickets
 curl -s -o /dev/null -w "%{http_code}\n" -b /tmp/boris.jar localhost:3000/tickets
 curl -s -o /dev/null -w "%{http_code}\n" -b /tmp/boris.jar localhost:3000/agent</code></pre>
-<div class="why"><b>Зачем:</b> middleware выполняется там, где происходит навигация. При прямом открытии это сервер: он отвечает редиректом 302 ещё до рендера, без мигания защищённой страницы. При переходе по ссылке — браузер. <code>useUserSession</code> работает в обоих местах: на сервере модуль читает сессию из cookie запроса. <code>abortNavigation(createError(...))</code> для чужой роли даёт 403, а не редирект на вход: пользователь вошёл, ему просто нельзя. <code>safeRedirect</code> из 4.1 защищает параметр <code>redirect</code>: в него может прийти что угодно, если ссылку на вход прислал злоумышленник.</div>
+<div class="why"><b>Зачем:</b> middleware выполняется там, где происходит навигация. При прямом открытии это сервер: он отвечает редиректом 302 ещё до рендера, без мигания защищённой страницы (при гидрации этой же страницы middleware повторяется в браузере). При переходе по ссылке — только браузер. <code>useUserSession</code> работает в обоих местах: на сервере модуль читает сессию из cookie запроса. <code>abortNavigation(createError(...))</code> для чужой роли даёт 403, а не редирект на вход: пользователь вошёл, ему просто нельзя. <code>safeRedirect</code> из 4.1 защищает параметр <code>redirect</code>: в него может прийти что угодно, если ссылку на вход прислал злоумышленник.</div>
 <div class="fix-box"><span class="tag">ОЖИДАЕМЫЙ РЕЗУЛЬТАТ</span>
 <pre>302 http://localhost:3000/login?redirect=/tickets
 200
 403</pre>
-<p>Без входа клик по «Мои обращения» в браузере ведёт на <code>/login?redirect=/tickets</code>, после входа — обратно на <code>/tickets</code>. Логи: при прямом открытии «СЕРВЕР /tickets», при клике по ссылке — строка в консоли браузера. Удалите <code>console.log</code>.</p></div>
+<p>Без входа клик по «Мои обращения» в браузере ведёт на <code>/login?redirect=/tickets</code>, после входа — обратно на <code>/tickets</code>. Логи (Борис вошёл): при прямом открытии «СЕРВЕР /tickets» в логах контейнера и «БРАУЗЕР /tickets» в консоли — это гидрация; при клике по ссылке — только строка в консоли браузера. Удалите <code>console.log</code>.</p></div>
 <div class="note-box"><span class="tag">ПРОВЕРЬ СЕБЯ</span><ul><li>Откройте <code>/login?redirect=//evil.example</code> и войдите. Что сделал <code>safeRedirect</code>? Уберите его временно: как повёл себя <code>navigateTo</code> с внешним адресом? Почему проверку всё равно стоит оставить своей?</li><li>Страницы закрыты middleware. Закрыт ли этим <code>/api/tickets</code>? (Ответ даст 4.3.)</li><li>Чем глобальный <code>auth.global.ts</code> хуже именованного для этого проекта?</li></ul></div>
 </div></div>
 
@@ -1800,7 +1811,7 @@ if (error.value) throw createError({ ...error.value, fatal: true })
 &lt;/template&gt;</code></pre>
 <p>В <code>tickets/new.vue</code> передайте email из сессии в форму: <code>&lt;TicketForm :initial-email="user?.email" …&gt;</code> с <code>const { user } = useUserSession()</code>.</p>
 <div class="why"><b>Зачем:</b> при клиентском переходе запрос к <code>/api/tickets</code> отправляет браузер, и cookie уходят автоматически. При F5 страницу рендерит сервер. Внутренний <code>$fetch</code> — новый запрос, в котором нет cookie входящего запроса: сервер не знает, чья это сессия, и API отвечает 401. <code>useFetch</code> на сервере использует <code>useRequestFetch()</code> и перекладывает заголовки. Этот баг особенно коварен: в разработке ходят по ссылкам, и он всплывает у первого пользователя, который открыл закладку. Обратите внимание: страницы защищает middleware, а данные — <code>requireUserSession</code>. Без него любой получил бы список обращений через curl.</div>
-<div class="fix-box"><span class="tag">ОЖИДАЕМЫЙ РЕЗУЛЬТАТ</span><p>Сломанная версия: по ссылке список показывается, после F5 — страница ошибки 401, хотя route middleware пропустил: сессия у страницы есть, у внутреннего запроса — нет. После исправления F5 работает. Борис видит свои два обращения и созданное в 3.2 на его email, Вера — одно. <code>/tickets/3</code> у Бориса (чужое) — 404.</p></div>
+<div class="fix-box"><span class="tag">ОЖИДАЕМЫЙ РЕЗУЛЬТАТ</span><p>Сломанная версия: по ссылке список показывается, после F5 — страница ошибки 401, хотя route middleware пропустил: сессия у страницы есть, у внутреннего запроса — нет. После исправления F5 работает. Борис видит свои два обращения из сида и созданное в 3.2 на его email, Вера — одно. Обращение Веры у Бориса (<code>/tickets/5</code>, если в 3.4 вы создали одно обращение: №1 — curl из 3.2, №2 — форма, №3–5 — сид) — 404.</p></div>
 <div class="note-box"><span class="tag">ПРОВЕРЬ СЕБЯ</span><ul><li>В сломанной версии найдите в логах внутренний запрос к <code>/api/tickets</code> при SSR. Прошёл ли он через server middleware, и какой у него request-id по сравнению с запросом страницы? Что это говорит о том, как Nitro выполняет внутренние запросы?</li><li>Как написать свой composable, которому нужен именно <code>$fetch</code> с cookie на сервере? (Подсказка: <code>useRequestFetch</code>.)</li><li>Почему для чужого обращения 404, а не 403? Когда 403 честнее?</li></ul></div>
 </div></div>
 
@@ -1975,7 +1986,7 @@ docker compose exec dev npx nuxi typecheck</code></pre>
 <pre>0
 403
 {"id":1,"status":"in_progress"}</pre>
-<p>Ноль: в HTML <code>/agent</code> нет текста страницы, даже с cookie агента — рендерит браузер. В браузере Анна видит очередь, смена статуса в select перезагружает список. Фильтр «В работе» показывает №1. У Бориса в «Моих обращениях» статус №1 тоже изменился. В логах: <code>Анна: №1 → in_progress</code>.</p></div>
+<p>Ноль: в HTML <code>/agent</code> нет текста страницы, даже с cookie агента — рендерит браузер. В браузере Анна видит очередь, смена статуса в select перезагружает список. Фильтр «В работе» показывает №1 и обращение Бориса про папку «Финансы» — оно в сиде сразу <code>in_progress</code>. У Бориса в «Моих обращениях» статус №1 тоже изменился. В логах: <code>Анна: №1 → in_progress</code>.</p></div>
 <div class="note-box"><span class="tag">БОНУС: ОТВЕТЫ АГЕНТА</span> Добавьте <code>POST /api/agent/tickets/[id]/messages</code> (схема <code>{ body: string min 1 }</code> в <code>shared/</code>, <code>authorId</code> из <code>requireAgent</code>) и страницу <code>/agent/tickets/[id]</code> с формой ответа. Ответ появится в «Переписке» у клиента на <code>/tickets/[id]</code>. Проверьте, что клиент не может писать в чужое обращение.</div>
 <div class="note-box"><span class="tag">ПРОВЕРЬ СЕБЯ</span><ul><li>При <code>ssr: false</code> где выполняются middleware <code>auth</code> и <code>agent</code> при прямом открытии <code>/agent</code>? Что видит анонимный пользователь до редиректа?</li><li>Почему в store нет <code>useFetch</code>? Что было бы, если бы кабинет рендерился на сервере?</li><li>Смена статуса ждёт ответа и перезагружает список. Как сделать её оптимистичной, как в Vue-лабе, и что делать при ошибке?</li></ul></div>
 </div></div>
@@ -2216,6 +2227,7 @@ const { data: results, status: searchStatus } = useFetch('/api/kb/search', {
 <p>После исправления:</p>
 <pre>"Как подключить VPN из дома"
 "Сброс пароля"
+"Гостевой Wi-Fi"                     ← «пароль» есть и в его description; порядок может отличаться
 1
 1
 [kb/search] кеш-промах, q="vpn"
@@ -2281,8 +2293,8 @@ grep -c 'Сейчас есть сбои' .output/public/kb/index.html</code></pr
 <pre>ℹ Prerendering 9 initial routes with crawler
   ├─ /kb …
   ├─ /kb/network/vpn-setup …
-network  access  hardware  index.html
-vpn-setup  wifi-guest  index.html
+_payload.json  access  hardware  index.html  network
+_payload.json  index.html  vpn-setup  wifi-guest
 [render] /status 2026-09-26T…Z                 ← один рендер на три запроса
 cache-control: s-maxage=60, stale-while-revalidate
 0
@@ -2597,7 +2609,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     NUXT_DB_PATH=/app/.data/app.sqlite
 COPY --from=build /app/.output ./.output
-COPY --from=build /app/server/db/migrations ./server/db/migrations    # их читает Nitro-плагин при старте
+# миграции читает Nitro-плагин при старте (комментарий — только отдельной строкой: в Dockerfile нет комментариев в конце строки)
+COPY --from=build /app/server/db/migrations ./server/db/migrations
 VOLUME ["/app/.data"]
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]</code></pre>
