@@ -2,7 +2,7 @@
 
 ![Nuxt](Nuxt.png)
 
-> **26.09.2026 — методичка вычитана и исправлена.** Что найдено и что поправлено — в [fixes/nuxt.md](https://github.com/meeymirita/lab-fixes/blob/main/nuxt.md) репозитория `lab-fixes`.
+> **26.09.2026 — методичка вычитана и исправлена.** Что найдено и что поправлено — в [fixes/frontend/nuxt.md](https://github.com/meeymirita/lab-fixes/blob/main/frontend/nuxt.md) репозитория `lab-fixes`.
 
 **Статус: ⚪ методичка готова, прохождение впереди.**
 **Сложность: высокая.** Проект полностью самостоятельный (свой репозиторий `nuxt-lab`), кода из других лаб не берёт. Vue предполагается знакомым на уровне Vue-лабы (`ref`, `computed`, props/emits, Pinia, Router — здесь не объясняются заново), TypeScript — на уровне сессий 1–3 TS-лабы.
