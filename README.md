@@ -1,6 +1,6 @@
 # Nuxt Lab — Help Center
 
-![Nuxt](https://meeymirita-files.storage.yandexcloud.net/nuxt/Nuxt.png)
+![Nuxt](https://raw.githubusercontent.com/meeymirita/works-lab/main/images/nuxt.png)
 
 > **26.09.2026 — методичка вычитана и исправлена.** Что найдено и что поправлено — в [fixes/frontend/nuxt.md](https://github.com/meeymirita/lab-fixes/blob/main/frontend/nuxt.md) репозитория `lab-fixes`.
 
